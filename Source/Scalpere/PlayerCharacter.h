@@ -6,7 +6,7 @@
 #include "GameFramework/Pawn.h"
 #include "Camera/CameraComponent.h"
 #include "MotionControllerComponent.h"
-//#include "HeadMountedDisplayFunctionLibrary.h"
+#include "AnimInstance_IKArms.h"
 
 #include "PlayerCharacter.generated.h"
 
@@ -53,6 +53,9 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Character Settings")
 	float m_rotationVerticalVelocity = 60.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Character Settings")
+	float m_armHeightFromHead = 10.0f;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -76,5 +79,5 @@ protected:
 
 	//Static mesh
 	UPROPERTY(EditAnywhere)
-	UStaticMeshComponent* m_objMesh;
+	USkeletalMeshComponent* m_armSkeletalMesh;
 };

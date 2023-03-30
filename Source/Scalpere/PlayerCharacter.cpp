@@ -12,8 +12,8 @@ APlayerCharacter::APlayerCharacter()
 	m_rootObj = CreateDefaultSubobject<USceneComponent>(TEXT("Player Character"));
 	SetRootComponent(m_rootObj);
 
-	m_objMesh = CreateDefaultSubobject< UStaticMeshComponent>(TEXT("Object Mesh"));
-	m_objMesh->SetupAttachment(m_rootObj);
+	m_armSkeletalMesh = CreateDefaultSubobject< USkeletalMeshComponent>(TEXT("Arm Mesh"));
+	m_armSkeletalMesh->SetupAttachment(m_rootObj);
 
 	m_camera = CreateDefaultSubobject< UCameraComponent>(TEXT("Player Camera"));
 	m_camera->FieldOfView = 90.0f;
@@ -43,6 +43,34 @@ void APlayerCharacter::BeginPlay()
 
 	m_leftController->bDisplayDeviceModel = true;
 	m_rightController->bDisplayDeviceModel = true;
+
+	UAnimInstance* animInstance = m_armSkeletalMesh->GetAnimInstance();
+
+	if (animInstance != nullptr)
+	{
+		UAnimInstance_IKArms* asIKArms = Cast<UAnimInstance_IKArms>(animInstance);
+
+		if (asIKArms != nullptr)
+		{
+			asIKArms->m_leftController = m_leftController;
+			asIKArms->m_rightController = m_rightController;
+			UE_LOG(LogTemp, Warning, TEXT("we set them all right"));
+
+		}
+		else
+
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Cant cast"));
+
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cant find instance"));
+
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Ohhh"));
+
 }
 
 // Called every frame
@@ -50,15 +78,51 @@ void APlayerCharacter::Tick(float p_deltaTime)
 {
 	Super::Tick(p_deltaTime);
 
-	//Offset for player moving around bounds
-	//FVector CameraOffset = m_camera->GetComponentLocation() - GetActorLocation();
-	//CameraOffset.Z = 0;
-	//SetActorLocation(GetActorLocation() + CameraOffset);	
+	//Auto rotate back	
+	FRotator cameraRot = m_camera->GetRelativeRotation();
+	FRotator meshRot = m_armSkeletalMesh->GetRelativeRotation();;
 
-	//FVector relativeLocation = m_camera->GetRelativeLocation();
-	//relativeLocation.X = 0.0f;
-	//relativeLocation.Y = 0.0f;
-	//m_camera->SetRelativeLocation(relativeLocation);
+	meshRot.Yaw = cameraRot.Yaw;
+
+	m_armSkeletalMesh->SetRelativeRotation(meshRot);
+
+	FVector cameraLoc = m_camera->GetRelativeLocation();
+	FVector meshLoc = m_armSkeletalMesh->GetRelativeLocation();
+	meshLoc.X = cameraLoc.X;
+	meshLoc.Y = cameraLoc.Y;
+	meshLoc.Z = cameraLoc.Z - m_armHeightFromHead;
+
+	m_armSkeletalMesh->SetRelativeLocation(meshLoc);
+
+	UAnimInstance* animInstance = m_armSkeletalMesh->GetAnimInstance();
+	if (animInstance != nullptr)
+	{
+		UAnimInstance_IKArms* asIKArms = Cast<UAnimInstance_IKArms>(animInstance);
+
+		if (asIKArms != nullptr)
+		{
+			if(asIKArms->m_leftController == nullptr)
+				UE_LOG(LogTemp, Warning, TEXT("nully"));
+
+
+			asIKArms->m_leftController = m_leftController;
+			asIKArms->m_rightController = m_rightController;
+			UE_LOG(LogTemp, Warning, TEXT("we set them all right"));
+
+		}
+		else
+
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Cant cast"));
+
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cant find instance"));
+
+	}
+	UE_LOG(LogTemp, Warning, TEXT("Ohhh"));
 }
 
 // Called to bind functionality to input
@@ -84,13 +148,14 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* p_playerInputC
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Constant_TranslateHorizontal(float p_input)
 {
-	FVector rightDir = GetActorRightVector();
+	FVector rightDir = m_camera->GetRightVector();
 	rightDir.Z = 0.0f;
 	rightDir.Normalize();
 
-	FVector newLoc = GetActorLocation();
+	FVector newLoc = m_rootObj->GetComponentLocation();
 	newLoc += rightDir * p_input * FApp::GetDeltaTime() * m_locomotionHorizontalVelocity;
-	SetActorLocation(newLoc);
+
+	m_rootObj->SetWorldLocation(newLoc);
 }
 
 /// <summary>
@@ -99,13 +164,13 @@ void APlayerCharacter::Constant_TranslateHorizontal(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Constant_TranslateForward(float p_input)
 {
-	FVector forwardDir = GetActorForwardVector();
+	FVector forwardDir = m_camera->GetForwardVector();
 	forwardDir.Z = 0.0f;
 	forwardDir.Normalize();
 
-	FVector newLoc = GetActorLocation();
+	FVector newLoc = m_rootObj->GetComponentLocation();
 	newLoc += forwardDir * p_input * FApp::GetDeltaTime() * m_locomotionForwardVelocity;
-	SetActorLocation(newLoc);
+	m_rootObj->SetWorldLocation(newLoc);
 }
 
 /// <summary>
@@ -114,9 +179,9 @@ void APlayerCharacter::Constant_TranslateForward(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Constant_RotateHorizontal(float p_input)
 {
-	FRotator newRot = GetActorRotation();
+	FRotator newRot = m_rootObj->GetComponentRotation();
 	newRot.Yaw += p_input * FApp::GetDeltaTime() * m_locomotionHorizontalVelocity;
-	SetActorRotation(newRot);
+	m_rootObj->SetWorldRotation(newRot);
 }
 
 /// <summary>
@@ -125,9 +190,9 @@ void APlayerCharacter::Constant_RotateHorizontal(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Constant_RotateVertical(float p_input)
 {
-	FRotator newRot = GetActorRotation();
+	FRotator newRot = m_rootObj->GetComponentRotation();
 	newRot.Pitch += p_input * FApp::GetDeltaTime() * m_rotationVerticalVelocity;
-	SetActorRotation(newRot);
+	m_rootObj->SetWorldRotation(newRot);
 }
 
 /// <summary>
@@ -136,13 +201,13 @@ void APlayerCharacter::Constant_RotateVertical(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Delta_TranslateHorizontal(float p_input)
 {
-	FVector rightDir = GetActorRightVector();
+	FVector rightDir = m_camera->GetRightVector();
 	rightDir.Z = 0.0f;
 	rightDir.Normalize();
 
-	FVector newLocation = GetActorLocation();
-	newLocation += rightDir * p_input * m_locomotionHorizontalVelocity;
-	SetActorLocation(newLocation);
+	FVector newLoc = m_rootObj->GetComponentLocation();
+	newLoc += rightDir * p_input * m_locomotionHorizontalVelocity;
+	m_rootObj->SetWorldLocation(newLoc);
 }
 
 /// <summary>
@@ -151,13 +216,13 @@ void APlayerCharacter::Delta_TranslateHorizontal(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Delta_TranslateForward(float p_input)
 {
-	FVector forwardDir = GetActorForwardVector();
+	FVector forwardDir = m_camera->GetForwardVector();
 	forwardDir.Z = 0.0f;
 	forwardDir.Normalize();
 
-	FVector newLocation = GetActorLocation();
-	newLocation += forwardDir * p_input * m_locomotionForwardVelocity;
-	SetActorLocation(newLocation);
+	FVector newLoc = m_rootObj->GetComponentLocation();
+	newLoc += forwardDir * p_input * m_locomotionForwardVelocity;
+	m_rootObj->SetWorldLocation(newLoc);
 }
 
 /// <summary>
@@ -166,9 +231,9 @@ void APlayerCharacter::Delta_TranslateForward(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Delta_RotateHorizontal(float p_input)
 {
-	FRotator newRot = GetActorRotation();
+	FRotator newRot = m_rootObj->GetComponentRotation();
 	newRot.Yaw += p_input * m_locomotionHorizontalVelocity;
-	SetActorRotation(newRot);
+	m_rootObj->SetWorldRotation(newRot);
 }
 
 /// <summary>
@@ -177,9 +242,9 @@ void APlayerCharacter::Delta_RotateHorizontal(float p_input)
 /// <param name="p_input">Current input</param>
 void APlayerCharacter::Delta_RotateVertical(float p_input)
 {
-	FRotator newRot = GetActorRotation();
+	FRotator newRot = m_rootObj->GetComponentRotation();
 	newRot.Pitch += p_input * m_rotationVerticalVelocity;
-	SetActorRotation(newRot);
+	m_rootObj->SetWorldRotation(newRot);
 }
 
 #pragma endregion
